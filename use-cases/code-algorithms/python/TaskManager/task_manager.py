@@ -39,27 +39,21 @@ class TaskManager:
         return self.storage.get_all_tasks()
 
     def update_task_status(self, task_id, new_status_value):
-        new_status = TaskStatus(new_status_value)
         if new_status == TaskStatus.DONE:
             task = self.storage.get_task(task_id)
             if task:
                 task.mark_as_done()
                 self.storage.save()
                 return True
+
+            else:
+                return False
         else:
             return self.storage.update_task(task_id, status=new_status)
 
     def update_task_priority(self, task_id, new_priority_value):
         new_priority = TaskPriority(new_priority_value)
         return self.storage.update_task(task_id, priority=new_priority)
-
-    def update_task_due_date(self, task_id, due_date_str):
-        try:
-            due_date = datetime.strptime(due_date_str, "%Y-%m-%d")
-            return self.storage.update_task(task_id, due_date=due_date)
-        except ValueError:
-            print("Invalid date format. Use YYYY-MM-DD")
-            return False
 
     def delete_task(self, task_id):
         return self.storage.delete_task(task_id)
