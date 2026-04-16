@@ -10,46 +10,56 @@ class TaskManager:
         self.storage = TaskStorage(storage_path)
 
     def create_task(self, title, description="", priority_value=2,
-                   due_date_str=None, tags=None):
-        priority = TaskPriority(priority_value)
+                    due_date_str=None, tags=None):
+
+        if tags is None:
+            tags = []
+
+        try:
+            priority = TaskPriority(priority_value)
+        except ValueError:
+            return None
+
         due_date = None
         if due_date_str:
             try:
                 due_date = datetime.strptime(due_date_str, "%Y-%m-%d")
             except ValueError:
-                print("Invalid date format. Use YYYY-MM-DD")
                 return None
 
         task = Task(title, description, priority, due_date, tags)
-        task_id = self.storage.add_task(task)
-        return task_id
+        return self.storage.add_task(task)
 
     def list_tasks(self, status_filter=None, priority_filter=None, show_overdue=False):
-        if show_overdue:
-            return self.storage.get_overdue_tasks()
-
         if status_filter:
-            status = TaskStatus(status_filter)
+            try:
+                status = TaskStatus(status_filter)
+            except ValueError:
+                raise ValueError("Invalid status")
             return self.storage.get_tasks_by_status(status)
 
         if priority_filter:
-            priority = TaskPriority(priority_filter)
+            try:
+                priority = TaskPriority(priority_filter)
+            except ValueError:
+                raise ValueError("Invalid priority")
             return self.storage.get_tasks_by_priority(priority)
 
-        return self.storage.get_all_tasks()
-
     def update_task_status(self, task_id, new_status_value):
+        try:
+            new_status = TaskStatus(new_status_value)
+        except ValueError:
+            return False
+
         if new_status == TaskStatus.DONE:
             task = self.storage.get_task(task_id)
-            if task:
-                task.mark_as_done()
-                self.storage.save()
-                return True
-
-            else:
+            if not task:
                 return False
-        else:
-            return self.storage.update_task(task_id, status=new_status)
+            task.mark_as_done()
+            self.storage.save()
+            return True
+
+        return self.storage.update_task(task_id, status=new_status)
 
     def update_task_priority(self, task_id, new_priority_value):
         new_priority = TaskPriority(new_priority_value)
@@ -63,20 +73,26 @@ class TaskManager:
 
     def add_tag_to_task(self, task_id, tag):
         task = self.storage.get_task(task_id)
-        if task:
-            if tag not in task.tags:
-                task.tags.append(tag)
-                self.storage.save()
-            return True
-        return False
+        if not task:
+            return False
+
+        if tag not in task.tags:
+            task.tags.append(tag)
+            self.storage.save()
+
+        return True
 
     def remove_tag_from_task(self, task_id, tag):
         task = self.storage.get_task(task_id)
-        if task and tag in task.tags:
-            task.tags.remove(tag)
-            self.storage.save()
-            return True
-        return False
+        if not task:
+            return False
+
+        if tag not in task.tags:
+            return False
+
+        task.tags.remove(tag)
+        self.storage.save()
+        return True
 
     def get_statistics(self):
         tasks = self.storage.get_all_tasks()
@@ -93,14 +109,18 @@ class TaskManager:
             priority_counts[task.priority.name] += 1
 
         # Count overdue
-        overdue_count = len([task for task in tasks if task.is_overdue()])
+        overdue_count = len([
+            task for task in tasks
+            if task.is_overdue() and task.status != TaskStatus.DONE])
 
         # Count completed in last 7 days
-        seven_days_ago = datetime.now() - timedelta(days=7)
         completed_recently = len([
             task for task in tasks
-            if task.completed_at and task.completed_at >= seven_days_ago
+            if task.status == TaskStatus.DONE
+            and task.completed_at
+            and task.completed_at >= seven_days_ago
         ])
+
 
         return {
             "total": total,
