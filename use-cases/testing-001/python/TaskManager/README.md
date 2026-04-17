@@ -70,4 +70,4 @@ python cli.py stats
 
 ### Run the Tests
 
-TODO
+python -m unittest test_cli.py
